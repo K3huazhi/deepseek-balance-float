@@ -15,24 +15,35 @@
 
 | 版本 | 体积 | 需要本机 Python | 适合 |
 | --- | --- | --- | --- |
-| **Lite** | 123 KB | 需要（Python 3.9+ 与 PySide6-Essentials） | 已装好 Python 环境，不想多占几十 MB |
-| **完整版** | 55.7 MB | 不需要，内置运行时 | 开箱即用，任何 Windows 11 机器 |
+| **Lite** | 126 KB | 需要（Python 3.9+ 与 PySide6-Essentials） | 已装好 Python 环境，不想多占几十 MB |
+| **完整版** | 55.8 MB | 不需要，内置运行时 | 开箱即用，任何 Windows 11 机器 |
 
 ### Lite 版（推荐已装 Python 的用户）
 
-**[⬇ DeepSeek-Balance-Float-Lite-v1.0.0.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v1.0.0/DeepSeek-Balance-Float-Lite-v1.0.0.exe)** · 123 KB
+**[⬇ DeepSeek-Balance-Float-Lite-v1.1.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v1.1/DeepSeek-Balance-Float-Lite-v1.1.exe)** · 126 KB
 
-SHA256：`e80a1e475f5f21a76afbfdc9b0f74a704b5c626db10e8c85bbc60e39de0e98a4`
+SHA256：`3f8b8bf8b03ccaa4d9654b802487e5447c256b3245a49e9f29a2151335c82ffc`
 
 Lite 版本身只有一百多 KB：它把应用源码内嵌在 exe 里，运行时会释放到 `%TEMP%\DeepSeekBalanceFloat\`，然后用你机器上的 Python + PySide6 启动，用完不占程序目录。首次运行会自动探测解释器；探测不到会弹窗让你手动选择 `python.exe`，选择结果记在注册表里，下次直接使用。
 
 ### 完整版（开箱即用）
 
-**[⬇ DeepSeek-Balance-Float-v1.0.0.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v1.0.0/DeepSeek-Balance-Float-v1.0.0.exe)** · 55.7 MB
+**[⬇ DeepSeek-Balance-Float-v1.1.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v1.1/DeepSeek-Balance-Float-v1.1.exe)** · 55.8 MB
 
 内置 Python 与 Qt 运行时，双击即用，无需任何环境。
 
-> 两个版本都未签名，首次运行 SmartScreen 可能提示「未知发布者」，点「更多信息 → 仍要运行」即可。
+> v1.1 起两个版本都使用自签名证书（`CN=K3huazhi`）签名。该证书不受公共 CA 信任，
+> 在未导入该证书的机器上 SmartScreen 仍可能提示「未知发布者」，点「更多信息 → 仍要运行」即可。
+
+### 排错：提示 `Could not create temporary directory!`
+
+如果 exe 放在**低完整性级别**的目录里（部分沙箱、同步盘、受限工作区），双击会以低完整性进程运行，
+无法写入 `%TEMP%`，完整版（PyInstaller 单文件）就会报这个错。
+
+解决办法任选其一：
+
+- 把 exe 移到普通目录（桌面、D 盘等）
+- 或给该目录设置继承级别：`icacls "<目录>" /setintegritylevel '(OI)(CI)Medium'`
 
 全部版本见 [Releases](https://github.com/K3huazhi/deepseek-balance-float/releases)。
 
