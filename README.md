@@ -11,13 +11,28 @@
 [![Release](https://img.shields.io/github/v/release/K3huazhi/deepseek-balance-float?label=release)](https://github.com/K3huazhi/deepseek-balance-float/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/K3huazhi/deepseek-balance-float/total)](https://github.com/K3huazhi/deepseek-balance-float/releases)
 
-不想装 Python 的话，直接下这个单文件版（Windows 11 x64，免安装，内置运行时）：
+提供两个版本，按需选择：
+
+| 版本 | 体积 | 需要本机 Python | 适合 |
+| --- | --- | --- | --- |
+| **Lite** | 123 KB | 需要（Python 3.9+ 与 PySide6-Essentials） | 已装好 Python 环境，不想多占几十 MB |
+| **完整版** | 55.7 MB | 不需要，内置运行时 | 开箱即用，任何 Windows 11 机器 |
+
+### Lite 版（推荐已装 Python 的用户）
+
+**[⬇ DeepSeek-Balance-Float-Lite-v1.0.0.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v1.0.0/DeepSeek-Balance-Float-Lite-v1.0.0.exe)** · 123 KB
+
+SHA256：`e80a1e475f5f21a76afbfdc9b0f74a704b5c626db10e8c85bbc60e39de0e98a4`
+
+Lite 版本身只有一百多 KB：它把应用源码内嵌在 exe 里，运行时会释放到 `%TEMP%\DeepSeekBalanceFloat\`，然后用你机器上的 Python + PySide6 启动，用完不占程序目录。首次运行会自动探测解释器；探测不到会弹窗让你手动选择 `python.exe`，选择结果记在注册表里，下次直接使用。
+
+### 完整版（开箱即用）
 
 **[⬇ DeepSeek-Balance-Float-v1.0.0.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v1.0.0/DeepSeek-Balance-Float-v1.0.0.exe)** · 55.7 MB
 
-SHA256：`6c2d273e3c12a3377b2c273b145d7f3b7ede37bbfffcdbe0229a5fdf3b710c79`
+内置 Python 与 Qt 运行时，双击即用，无需任何环境。
 
-> 程序未签名，首次运行 SmartScreen 可能提示「未知发布者」，点「更多信息 → 仍要运行」即可。
+> 两个版本都未签名，首次运行 SmartScreen 可能提示「未知发布者」，点「更多信息 → 仍要运行」即可。
 
 全部版本见 [Releases](https://github.com/K3huazhi/deepseek-balance-float/releases)。
 
@@ -142,6 +157,7 @@ pyinstaller --noconfirm --clean --onefile --windowed ^
 
 ```
 balance_float.py      # 全部源码（Python 后端 + 内嵌 QML 界面）
+launcher.cs           # Lite 版启动器（C#，约 120 行）
 run.bat               # 无控制台启动脚本
 requirements.txt      # 依赖
 LICENSE               # MIT 许可
@@ -149,6 +165,30 @@ README.md
 ```
 
 界面使用 Qt Quick（QML 以字符串内嵌，便于单文件打包），后端使用 PySide6 的 `QObject` 属性/槽与 QML 双向绑定。
+
+### 构建 Lite 版
+
+Lite 启动器用 Windows 自带的 .NET Framework 编译器即可构建，无需额外安装 SDK：
+
+```powershell
+csc /nologo /target:winexe /optimize+ /codepage:65001 ^
+    /win32icon:icon.ico ^
+    /r:System.Windows.Forms.dll ^
+    /resource:balance_float.py,balance_float.py ^
+    /out:DeepSeek-Balance-Float-Lite.exe launcher.cs
+```
+
+（`csc.exe` 位于 `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\`）
+
+启动器做的事很简单：
+
+1. 把内嵌的 `balance_float.py` 释放到 `%TEMP%\DeepSeekBalanceFloat\`
+2. 依次探测 Python：注册表记录的路径 → `PATH` → 注册表 `PythonCore` → 常见安装目录
+3. 用 `python -c "import PySide6"` 逐个验证，选第一个可用的
+4. 以 detached 方式拉起应用，自身立即退出
+
+若都没找到，会弹窗让用户手动选择 `python.exe`，并把路径记到
+`HKCU\Software\DeepSeekBalance\python`，之后直接复用。
 
 ---
 

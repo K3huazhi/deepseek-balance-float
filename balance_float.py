@@ -2060,10 +2060,14 @@ class Backend(QObject):
                 os.remove(p)
             else:
                 os.makedirs(os.path.dirname(p), exist_ok=True)
-                with open(p, "w", encoding="gbk") as f:
+                with open(p, "w", encoding="gbk", newline="") as f:
                     f.write("@echo off\r\n")
+                    lite_exe = os.environ.get("DSH_LITE_EXE")
                     if getattr(sys, "frozen", False):
                         f.write('start "" "%s"\r\n' % sys.executable)
+                    elif lite_exe and os.path.exists(lite_exe):
+                        # Lite 版由启动器拉起，自启必须指向启动器本身
+                        f.write('start "" "%s"\r\n' % lite_exe)
                     else:
                         pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
                         if not os.path.exists(pyw):
@@ -2084,7 +2088,9 @@ class Backend(QObject):
 
         m = QMenu()
         m.setAttribute(Qt.WA_TranslucentBackground)
-        m.setWindowFlags(m.windowFlags() | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
+        # 悬浮窗本身是置顶的，菜单必须也置顶，否则会被卡片挡住
+        m.setWindowFlags(m.windowFlags() | Qt.FramelessWindowHint
+                         | Qt.NoDropShadowWindowHint | Qt.WindowStaysOnTopHint)
         m.setMinimumWidth(158)
         style = ("QMenu{background:%s;border:1px solid %s;border-radius:8px;padding:5px;"
                  "color:%s;font-family:'Microsoft YaHei UI';font-size:12px;}"
@@ -2099,6 +2105,8 @@ class Backend(QObject):
         m.addSeparator()
         theme_menu = m.addMenu("主题")
         theme_menu.setStyleSheet(style)
+        theme_menu.setWindowFlags(theme_menu.windowFlags() | Qt.FramelessWindowHint
+                                  | Qt.NoDropShadowWindowHint | Qt.WindowStaysOnTopHint)
         cur_theme = self.store.get("theme", "auto")
         for label, mode in (("亮色", "light"), ("暗色", "dark"), ("跟随系统", "auto")):
             act = theme_menu.addAction(("● " if cur_theme == mode else "    ") + label)
