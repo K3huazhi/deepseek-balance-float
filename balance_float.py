@@ -69,12 +69,25 @@ class Win11:
     """系统材质：云母 / 圆角 / 暗色标题栏 / 置顶"""
 
     def __init__(self):
-        self.dwm = ctypes.windll.dwmapi
-        self.user32 = ctypes.windll.user32
+        self.dwm = ctypes.WinDLL("dwmapi", use_last_error=True)
+        self.user32 = ctypes.WinDLL("user32", use_last_error=True)
+        # SetWindowPos 的 hWndInsertAfter 是 HANDLE：不声明 argtypes 时
+        # Python 的 -1 / -2 会被当成 32 位整数，导致调用静默失败（置顶失效）
+        self.user32.SetWindowPos.argtypes = [
+            wintypes.HWND, wintypes.HWND,
+            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+            wintypes.UINT,
+        ]
+        self.user32.SetWindowPos.restype = wintypes.BOOL
+        self.dwm.DwmSetWindowAttribute.argtypes = [
+            wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD,
+        ]
+        self.dwm.DwmSetWindowAttribute.restype = ctypes.c_long
 
     def _set(self, hwnd, attr, value):
         v = ctypes.c_int(value)
-        return self.dwm.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(v), ctypes.sizeof(v))
+        return self.dwm.DwmSetWindowAttribute(
+            wintypes.HWND(int(hwnd)), attr, ctypes.byref(v), ctypes.sizeof(v))
 
     def apply_backdrop(self, hwnd, dark):
         if not hwnd:
@@ -94,7 +107,8 @@ class Win11:
     def set_topmost(self, hwnd, on):
         try:
             self.user32.SetWindowPos(
-                int(hwnd), HWND_TOPMOST if on else HWND_NOTOPMOST,
+                wintypes.HWND(int(hwnd)),
+                wintypes.HWND(HWND_TOPMOST if on else HWND_NOTOPMOST),
                 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
         except Exception as e:
             print("topmost:", e)
@@ -2052,6 +2066,40 @@ class Backend(QObject):
     def autostartEnabled(self):
         return os.path.exists(self._startup_bat())
 
+    def _notify(self, text, title=APP_NAME):
+        """窗口化运行时没有控制台，出错要用弹窗告诉用户"""
+        try:
+            ctypes.windll.user32.MessageBoxW(0, text, title, 0x10)
+        except Exception:
+            print(text)
+
+    def _write_startup_bat(self, path):
+        line = None
+        lite_exe = os.environ.get("DSH_LITE_EXE")
+        if getattr(sys, "frozen", False):
+            line = 'start "" "%s"' % sys.executable
+        elif lite_exe and os.path.exists(lite_exe):
+            # Lite 版由启动器拉起，自启必须指向启动器本身
+            line = 'start "" "%s"' % lite_exe
+        else:
+            pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+            if not os.path.exists(pyw):
+                pyw = sys.executable
+            line = 'start "" "%s" "%s"' % (pyw, os.path.join(HERE, "balance_float.py"))
+
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        # 启动目录偶尔会被杀软/索引服务短暂占用，重试几次
+        last = None
+        for _ in range(4):
+            try:
+                with open(path, "w", encoding="gbk", newline="") as f:
+                    f.write("@echo off\r\n" + line + "\r\n")
+                return True
+            except Exception as e:
+                last = e
+                time.sleep(0.2)
+        raise last
+
     @Slot()
     def toggleAutostart(self):
         p = self._startup_bat()
@@ -2059,23 +2107,12 @@ class Backend(QObject):
             if os.path.exists(p):
                 os.remove(p)
             else:
-                os.makedirs(os.path.dirname(p), exist_ok=True)
-                with open(p, "w", encoding="gbk", newline="") as f:
-                    f.write("@echo off\r\n")
-                    lite_exe = os.environ.get("DSH_LITE_EXE")
-                    if getattr(sys, "frozen", False):
-                        f.write('start "" "%s"\r\n' % sys.executable)
-                    elif lite_exe and os.path.exists(lite_exe):
-                        # Lite 版由启动器拉起，自启必须指向启动器本身
-                        f.write('start "" "%s"\r\n' % lite_exe)
-                    else:
-                        pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
-                        if not os.path.exists(pyw):
-                            pyw = sys.executable
-                        f.write('start "" "%s" "%s"\r\n'
-                                % (pyw, os.path.join(HERE, "balance_float.py")))
+                self._write_startup_bat(p)
         except Exception as e:
             print("autostart:", e)
+            self._notify("设置开机自启失败：\n\n%s\n\n"
+                         "路径：%s\n\n"
+                         "可以手动把启动器/程序做成快捷方式放进启动文件夹。" % (e, p))
 
     # ---------------------------------------------------------- 右键菜单
     @Slot()
