@@ -6,6 +6,23 @@
 
 ---
 
+## 下载
+
+[![Release](https://img.shields.io/github/v/release/K3huazhi/deepseek-balance-float?label=release)](https://github.com/K3huazhi/deepseek-balance-float/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/K3huazhi/deepseek-balance-float/total)](https://github.com/K3huazhi/deepseek-balance-float/releases)
+
+不想装 Python 的话，直接下这个单文件版（Windows 11 x64，免安装，内置运行时）：
+
+**[⬇ DeepSeek-Balance-Float-v1.0.0.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v1.0.0/DeepSeek-Balance-Float-v1.0.0.exe)** · 55.7 MB
+
+SHA256：`6c2d273e3c12a3377b2c273b145d7f3b7ede37bbfffcdbe0229a5fdf3b710c79`
+
+> 程序未签名，首次运行 SmartScreen 可能提示「未知发布者」，点「更多信息 → 仍要运行」即可。
+
+全部版本见 [Releases](https://github.com/K3huazhi/deepseek-balance-float/releases)。
+
+---
+
 ## 功能特性
 
 ### 界面
