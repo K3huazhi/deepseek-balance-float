@@ -2,7 +2,7 @@
 
 一个用于实时显示 DeepSeek API 账户余额的 Windows 桌面悬浮窗，采用 WinUI 3 / Fluent Design 风格，支持系统云母（Mica）背板、亮暗主题切换、多 Key 管理与用量统计。
 
-> 纯 Python + PySide6 实现，无需安装 .NET 或 Windows App SDK，任何 Windows 11 机器（x64）都能直接运行。
+> 原生 C# + WPF 实现，单个 103 KB 的 exe，无任何外部依赖；Windows 10 1903+ / 11 双击即用。
 
 ---
 
@@ -11,41 +11,29 @@
 [![Release](https://img.shields.io/github/v/release/K3huazhi/deepseek-balance-float?label=release)](https://github.com/K3huazhi/deepseek-balance-float/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/K3huazhi/deepseek-balance-float/total)](https://github.com/K3huazhi/deepseek-balance-float/releases)
 
-提供两个版本，按需选择：
+**一个版本，双击即用。**
 
-| 版本 | 体积 | 需要本机 Python | 适合 |
+| 版本 | 体积 | 依赖 | 说明 |
 | --- | --- | --- | --- |
-| **Lite** | 126 KB | 需要（Python 3.9+ 与 PySide6-Essentials） | 已装好 Python 环境，不想多占几十 MB |
-| **完整版** | 55.8 MB | 不需要，内置运行时 | 开箱即用，任何 Windows 11 机器 |
+| **v1.2 原生版** | **103 KB** | 无（.NET Framework 4.8 系统自带） | 推荐 |
+| v1.1 Python 版 | 55.8 MB / 126 KB | 内置运行时 / 需 Python | 已归档，不再更新 |
 
-### Lite 版（推荐已装 Python 的用户）
+### v1.2 原生版（推荐）
 
-**[⬇ DeepSeek-Balance-Float-Lite-v1.1.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v1.1/DeepSeek-Balance-Float-Lite-v1.1.exe)** · 126 KB
+**[⬇ DeepSeek-Balance-Float-v1.2.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v1.2/DeepSeek-Balance-Float-v1.2.exe)** · 103 KB
 
-SHA256：`3f8b8bf8b03ccaa4d9654b802487e5447c256b3245a49e9f29a2151335c82ffc`
+SHA256：`b998d7806a2d84234283ac14404118b71c83c1ccc7cda27b2943d3cb5585613b`
 
-Lite 版本身只有一百多 KB：它把应用源码内嵌在 exe 里，运行时会释放到 `%TEMP%\DeepSeekBalanceFloat\`，然后用你机器上的 Python + PySide6 启动，用完不占程序目录。首次运行会自动探测解释器；探测不到会弹窗让你手动选择 `python.exe`，选择结果记在注册表里，下次直接使用。
+用 C# + WPF 重写，编译产物只有 103 KB。Windows 10 1903+ 与 Windows 11 自带 .NET Framework 4.8，
+所以**不需要安装 Python，也不需要装任何运行时**，双击即用，启动不到 1 秒。
 
-### 完整版（开箱即用）
+> 使用自签名证书（`CN=K3huazhi`）签名。该证书不受公共 CA 信任，未导入证书的机器上
+> SmartScreen 仍可能提示「未知发布者」，点「更多信息 → 仍要运行」即可。
 
-**[⬇ DeepSeek-Balance-Float-v1.1.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v1.1/DeepSeek-Balance-Float-v1.1.exe)** · 55.8 MB
+升级说明：Key 存在 Windows 凭据管理器、设置与统计存在注册表，
+与 Python 版使用相同位置，**从旧版本升级不会丢失 Key、命名和历史消耗记录**。
 
-内置 Python 与 Qt 运行时，双击即用，无需任何环境。
-
-> v1.1 起两个版本都使用自签名证书（`CN=K3huazhi`）签名。该证书不受公共 CA 信任，
-> 在未导入该证书的机器上 SmartScreen 仍可能提示「未知发布者」，点「更多信息 → 仍要运行」即可。
-
-### 排错：提示 `Could not create temporary directory!`
-
-如果 exe 放在**低完整性级别**的目录里（部分沙箱、同步盘、受限工作区），双击会以低完整性进程运行，
-无法写入 `%TEMP%`，完整版（PyInstaller 单文件）就会报这个错。
-
-解决办法任选其一：
-
-- 把 exe 移到普通目录（桌面、D 盘等）
-- 或给该目录设置继承级别：`icacls "<目录>" /setintegritylevel '(OI)(CI)Medium'`
-
-全部版本见 [Releases](https://github.com/K3huazhi/deepseek-balance-float/releases)。
+历史版本见 [Releases](https://github.com/K3huazhi/deepseek-balance-float/releases)。
 
 ---
 
@@ -86,31 +74,23 @@ Lite 版本身只有一百多 KB：它把应用源码内嵌在 exe 里，运行�
 
 ## 环境要求
 
-- Windows 11 x64（Windows 10 也可运行，但没有云母材质）
-- Python 3.9+（开发时使用 3.12）
-- 依赖：`PySide6-Essentials`（含 Qt Quick / Qt Quick Shapes / QtSvg）
-
-```bash
-pip install -r requirements.txt
-```
+- Windows 10 1903+ / Windows 11（x64）
+- 无需安装任何运行时（.NET Framework 4.8 为系统组件）
 
 ---
 
 ## 运行
 
-```bash
-python balance_float.py
-```
-
-或双击 `run.bat`（无控制台窗口）。
-
-首次启动如果没有配置 Key，会自动弹出 **API Key 管理**窗口：
+双击 `DeepSeek-Balance-Float.exe` 即可。首次启动没有 Key 时会弹出 **API Key 管理**窗口：
 
 1. 复制你的 DeepSeek API Key（`sk-...`）
 2. 在输入框中 **右键即可直接粘贴**
 3. 回车或点「添加」保存
 
 之后的 Key 管理可以从右键菜单进入。
+
+> 建议把 exe 放在普通目录（桌面、D 盘等）。某些沙箱/同步盘目录会带低完整性标记，
+> 这会让程序无法写入注册表。
 
 ---
 
@@ -148,58 +128,54 @@ python balance_float.py
 
 ---
 
-## 打包为单文件 EXE
+## 从源码构建
 
-```bash
-pip install pyinstaller
-pyinstaller --noconfirm --clean --onefile --windowed ^
-    --name "DeepSeek余额悬浮窗" ^
-    --icon icon.ico ^
-    balance_float.py
+原生版用系统自带的 `csc.exe` 编译，不需要安装 SDK、Visual Studio 或任何 NuGet 包：
+
+```powershell
+$bin = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319'
+$wpf = Join-Path $bin 'WPF'
+$refs = @(
+  (Join-Path $wpf 'PresentationFramework.dll'),
+  (Join-Path $wpf 'PresentationCore.dll'),
+  (Join-Path $wpf 'WindowsBase.dll'),
+  (Join-Path $bin 'System.Xaml.dll'),
+  (Join-Path $bin 'System.Web.Extensions.dll'),
+  (Join-Path $bin 'System.Core.dll')
+) | ForEach-Object { "/r:$_" }
+
+& "$bin\csc.exe" /nologo /target:winexe /optimize+ /codepage:65001 /platform:anycpu `
+  /win32manifest:app.manifest /win32icon:icon.ico $refs `
+  /out:DeepSeek-Balance-Float.exe core.cs program.cs ui_main.cs ui_keys.cs
 ```
 
-产物在 `dist\` 目录下，单文件约 58 MB，目标机器无需安装 Python。
-
-> 单文件模式启动时会把运行时解压到 `%TEMP%\_MEIxxxx`，退出自动清理；这不涉及任何配置或用户数据。
+产物就是单个 103 KB 的 exe。
 
 ---
 
 ## 项目结构
 
 ```
-balance_float.py      # 全部源码（Python 后端 + 内嵌 QML 界面）
-launcher.cs           # Lite 版启动器（C#，约 120 行）
-run.bat               # 无控制台启动脚本
-requirements.txt      # 依赖
-LICENSE               # MIT 许可
-README.md
+native/
+  core.cs          Win32 / DWM 云母 / 凭据管理器 / 注册表 / HTTP / 统计
+  ui_main.cs       主窗口：卡片、详情、多 Key 视图、主题波纹、右键菜单
+  ui_keys.cs       API Key 管理窗口
+  program.cs       入口、单实例互斥、鲸鱼 SVG 路径
+  app.manifest     PerMonitorV2 高 DPI + asInvoker
+
+balance_float.py   v1.1 及更早的 Python 实现（已归档，保留作参考）
+launcher.cs        v1.1 精简版启动器（已归档）
 ```
 
-界面使用 Qt Quick（QML 以字符串内嵌，便于单文件打包），后端使用 PySide6 的 `QObject` 属性/槽与 QML 双向绑定。
+### v1.2 的技术选择
 
-### 构建 Lite 版
-
-Lite 启动器用 Windows 自带的 .NET Framework 编译器即可构建，无需额外安装 SDK：
-
-```powershell
-csc /nologo /target:winexe /optimize+ /codepage:65001 ^
-    /win32icon:icon.ico ^
-    /r:System.Windows.Forms.dll ^
-    /resource:balance_float.py,balance_float.py ^
-    /out:DeepSeek-Balance-Float-Lite.exe launcher.cs
-```
-
-（`csc.exe` 位于 `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\`）
-
-启动器做的事很简单：
-
-1. 把内嵌的 `balance_float.py` 释放到 `%TEMP%\DeepSeekBalanceFloat\`
-2. 依次探测 Python：注册表记录的路径 → `PATH` → 注册表 `PythonCore` → 常见安装目录
-3. 用 `python -c "import PySide6"` 逐个验证，选第一个可用的
-4. 以 detached 方式拉起应用，自身立即退出
-
-若都没找到，会弹窗让用户手动选择 `python.exe`，并把路径记到
-`HKCU\Software\DeepSeekBalance\python`，之后直接复用。
+- **云母**：`DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE, 2)` 配合
+  `DwmExtendFrameIntoClientArea` 与透明合成目标；圆角用 `DWMWA_WINDOW_CORNER_PREFERENCE`
+- **签名验证**：`MSIX` 不需要，直接 `Set-AuthenticodeSignature` 即可
+- **主题波纹**：椭圆 `ScaleTransform` 动画从主题按钮位置扩散，文字颜色同步插值
+- **Key 存储**：`CredReadW / CredWriteW`，与 Python 版同一目标名 `DeepSeekBalance:api_key`
+- **开机自启**：写 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`，
+  不用 Startup 目录的 bat（实测会被安全软件拦截）
 
 ---
 
