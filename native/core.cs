@@ -104,6 +104,52 @@ namespace Dsb
             return (GetWindowLong(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
         }
 
+        // ---------------------------------------------------- 显示器 / 光标
+        [StructLayout(LayoutKind.Sequential)]
+        public struct POINT { public int X, Y; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RECT { public int Left, Top, Right, Bottom; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MONITORINFO
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public uint dwFlags;
+        }
+
+        public const uint MONITOR_DEFAULTTONEAREST = 2;
+
+        [DllImport("user32.dll")]
+        public static extern bool GetCursorPos(out POINT point);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr MonitorFromPoint(POINT point, uint flags);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
+
+        /// 屏幕坐标（物理像素）→ 该点所在显示器的工作区（物理像素）
+        public static bool TryWorkArea(int x, int y, out RECT work)
+        {
+            work = new RECT();
+            try
+            {
+                POINT pt;
+                pt.X = x; pt.Y = y;
+                IntPtr mon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+                if (mon == IntPtr.Zero) return false;
+                MONITORINFO mi = new MONITORINFO();
+                mi.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+                if (!GetMonitorInfo(mon, ref mi)) return false;
+                work = mi.rcWork;
+                return true;
+            }
+            catch { return false; }
+        }
+
         private static void Try(Action a)
         {
             try { a(); } catch { }

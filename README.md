@@ -2,7 +2,7 @@
 
 一个用于实时显示 DeepSeek API 账户余额的 Windows 桌面悬浮窗，采用 WinUI 3 / Fluent Design 风格，支持系统云母（Mica）背板、亮暗主题切换、多 Key 管理与用量统计。
 
-> 原生 C# + WPF 实现，单个 103 KB 的 exe，无任何外部依赖；Windows 10 1903+ / 11 双击即用。
+> 原生 C# + WPF 实现，单个约 106 KB 的 exe，无任何外部依赖；Windows 10 1903+ / 11 双击即用。
 
 ---
 
@@ -15,17 +15,18 @@
 
 | 版本 | 体积 | 依赖 | 说明 |
 | --- | --- | --- | --- |
-| **v1.2 原生版** | **103 KB** | 无（.NET Framework 4.8 系统自带） | 推荐 |
+| **v1.2 原生版** | **106 KB** | 无（.NET Framework 4.8 系统自带） | 推荐 |
 | v1.1 Python 版 | 55.8 MB / 126 KB | 内置运行时 / 需 Python | 已归档，不再更新 |
 
 ### v1.2 原生版（推荐）
 
-**[⬇ DeepSeek-Balance-Float-v1.2.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v1.2/DeepSeek-Balance-Float-v1.2.exe)** · 103 KB
+**[⬇ DeepSeek-Balance-Float-v1.2.1.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v1.2.1/DeepSeek-Balance-Float-v1.2.1.exe)** · 106 KB
 
-SHA256：`b998d7806a2d84234283ac14404118b71c83c1ccc7cda27b2943d3cb5585613b`
+SHA256：`77f38af2702560623bfc1f5d1e6853df5ace68951a695554a5b523afd55b603f`
 
-用 C# + WPF 重写，编译产物只有 103 KB。Windows 10 1903+ 与 Windows 11 自带 .NET Framework 4.8，
+用 C# + WPF 重写，编译产物只有 106 KB。Windows 10 1903+ 与 Windows 11 自带 .NET Framework 4.8，
 所以**不需要安装 Python，也不需要装任何运行时**，双击即用，启动不到 1 秒。
+拖动窗口靠近屏幕边缘时会自动吸附对齐。
 
 > 使用自签名证书（`CN=K3huazhi`）签名。该证书不受公共 CA 信任，未导入证书的机器上
 > SmartScreen 仍可能提示「未知发布者」，点「更多信息 → 仍要运行」即可。
@@ -43,7 +44,8 @@ SHA256：`b998d7806a2d84234283ac14404118b71c83c1ccc7cda27b2943d3cb5585613b`
 - **系统云母材质**：调用 DWM 的 Mica 背板（Windows 11），窗口透明无边框、圆角、隐藏系统描边
 - **亮色 / 暗色 / 跟随系统**：一键切换，切换时带回波扩散的换肤动画
 - **余额动效**：数字滚动计数，余额减少时抖动并飘出红色 `-¥0.01`
-- **拖动定位**：拖动窗口任意位置移动，位置自动记忆；可置顶；可开机自启
+- **拖动定位**：拖动窗口任意位置移动，靠近屏幕边缘时自动吸附（12 px 内），位置自动记忆，多显示器各自吸附
+- **可置顶、可开机自启**
 
 ### 数据
 - **余额展示**：实时余额、可用状态、充值余额、赠送余额、今日消费
@@ -149,7 +151,7 @@ $refs = @(
   /out:DeepSeek-Balance-Float.exe core.cs program.cs ui_main.cs ui_keys.cs
 ```
 
-产物就是单个 103 KB 的 exe。
+产物就是单个约 106 KB 的 exe。
 
 ---
 

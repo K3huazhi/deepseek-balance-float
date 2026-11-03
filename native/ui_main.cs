@@ -167,6 +167,13 @@ namespace Dsb
         private bool _mica;
         private ContextMenu _menu;
 
+        // 拖动 / 吸附
+        private const double SnapDistance = 12;
+        private bool _dragging;
+        private bool _dragMoved;
+        private double _grabX, _grabY;
+        private double _lastLeft, _lastTop;
+
         public MainWindow()
         {
             _store = new Store();
@@ -296,7 +303,8 @@ namespace Dsb
             Content = _root;
             MouseLeftButtonDown += OnRootDown;
             MouseRightButtonUp += OnRightUp;
-            MouseLeftButtonUp += delegate { _stats.Save(); };
+            MouseMove += OnRootMove;
+            MouseLeftButtonUp += OnRootUp;
         }
 
         private static Viewbox MakeWhale(double w, double h, Brush fill, double opacity)
@@ -467,16 +475,20 @@ namespace Dsb
 
         private void RestoreGeometry()
         {
-            double sw = SystemParameters.WorkArea.Width;
-            double sh = SystemParameters.WorkArea.Height;
+            Rect primary = SystemParameters.WorkArea;
             double x, y;
             string sx = _store.Get("x", ""), sy = _store.Get("y", "");
             if (!double.TryParse(sx, NumberStyles.Any, CultureInfo.InvariantCulture, out x))
-                x = sw - WinW - 28;
+                x = primary.Right - WinW - 28;
             if (!double.TryParse(sy, NumberStyles.Any, CultureInfo.InvariantCulture, out y))
                 y = 28;
-            x = Math.Max(0, Math.Min(x, sw - WinW));
-            y = Math.Max(0, Math.Min(y, sh - Height));
+
+            // 先落到保存位置，再按该位置所在显示器修正
+            Left = x;
+            Top = y;
+            Rect wa = WorkAreaAt(x + WinW / 2, y + Height / 2);
+            x = Math.Max(wa.Left, Math.Min(x, Math.Max(wa.Left, wa.Right - WinW)));
+            y = Math.Max(wa.Top, Math.Min(y, Math.Max(wa.Top, wa.Bottom - Height)));
             Left = x;
             Top = y;
         }
@@ -907,10 +919,98 @@ namespace Dsb
         private void OnRootDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ButtonState != MouseButtonState.Pressed) return;
-            if (e.OriginalSource is Border && ((Border)e.OriginalSource).Tag is Action) return;
-            try { DragMove(); } catch { }
+            Border border = e.OriginalSource as Border;
+            if (border != null && border.Tag is Action) return;
+            TextBlock tb = e.OriginalSource as TextBlock;
+            if (tb != null && tb.IsHitTestVisible) return;
+
+            Point c = CursorDip();
+            _grabX = c.X - Left;
+            _grabY = c.Y - Top;
+            _lastLeft = Left;
+            _lastTop = Top;
+            _dragMoved = false;
+            _dragging = true;
+            CaptureMouse();
+        }
+
+        private void OnRootMove(object sender, MouseEventArgs e)
+        {
+            if (!_dragging) return;
+            Point c = CursorDip();
+            double left = c.X - _grabX;
+            double top = c.Y - _grabY;
+
+            if (!_dragMoved)
+            {
+                if (Math.Abs(left - _lastLeft) < 1 && Math.Abs(top - _lastTop) < 1) return;
+                _dragMoved = true;
+            }
+            ApplyPosition(left, top);
+        }
+
+        private void OnRootUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_dragging)
+            {
+                _dragging = false;
+                ReleaseMouseCapture();
+                if (_dragMoved) SavePosition();
+                _dragMoved = false;
+            }
+            _stats.Save();
+        }
+
+        private void SavePosition()
+        {
             _store.Set("x", Left.ToString("0", CultureInfo.InvariantCulture));
             _store.Set("y", Top.ToString("0", CultureInfo.InvariantCulture));
+        }
+
+        /// 光标位置（DIP，屏幕坐标）
+        private Point CursorDip()
+        {
+            Native.POINT p;
+            if (!Native.GetCursorPos(out p)) return new Point(Left, Top);
+            PresentationSource src = PresentationSource.FromVisual(this);
+            if (src == null || src.CompositionTarget == null) return new Point(p.X, p.Y);
+            Matrix m = src.CompositionTarget.TransformFromDevice;
+            return m.Transform(new Point(p.X, p.Y));
+        }
+
+        /// 指定 DIP 点所在显示器的工作区（DIP）
+        private Rect WorkAreaAt(double dipX, double dipY)
+        {
+            PresentationSource src = PresentationSource.FromVisual(this);
+            Matrix toDev = src != null && src.CompositionTarget != null
+                ? src.CompositionTarget.TransformToDevice : Matrix.Identity;
+            Point px = toDev.Transform(new Point(dipX, dipY));
+            Native.RECT work;
+            if (!Native.TryWorkArea((int)Math.Round(px.X), (int)Math.Round(px.Y), out work))
+                return SystemParameters.WorkArea;
+            Matrix fromDev = src != null && src.CompositionTarget != null
+                ? src.CompositionTarget.TransformFromDevice : Matrix.Identity;
+            Point tl = fromDev.Transform(new Point(work.Left, work.Top));
+            Point br = fromDev.Transform(new Point(work.Right, work.Bottom));
+            return new Rect(tl, br);
+        }
+
+        /// 贴近屏幕边缘时吸附，并限制在工作区内
+        private void ApplyPosition(double left, double top)
+        {
+            Rect wa = WorkAreaAt(left + Width / 2, top + Height / 2);
+
+            if (Math.Abs(left - wa.Left) <= SnapDistance) left = wa.Left;
+            else if (Math.Abs(left + Width - wa.Right) <= SnapDistance) left = wa.Right - Width;
+
+            if (Math.Abs(top - wa.Top) <= SnapDistance) top = wa.Top;
+            else if (Math.Abs(top + Height - wa.Bottom) <= SnapDistance) top = wa.Bottom - Height;
+
+            left = Math.Max(wa.Left, Math.Min(left, Math.Max(wa.Left, wa.Right - Width)));
+            top = Math.Max(wa.Top, Math.Min(top, Math.Max(wa.Top, wa.Bottom - Height)));
+
+            Left = left;
+            Top = top;
         }
 
         private void OnRightUp(object sender, MouseButtonEventArgs e)
