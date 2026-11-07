@@ -505,10 +505,6 @@ namespace Dsb
                     ApplyThemeInstant();
                 }
             }
-            int wait = 60;
-            try { wait = Math.Max(5, int.Parse(_store.Get("interval", "60"))); }
-            catch { wait = 60; }
-            _nextFetch = DateTime.Now.AddSeconds(wait);
         }
 
         private DateTime _nextFetch = DateTime.MinValue;
@@ -733,7 +729,7 @@ namespace Dsb
         private void ApplyRows(List<Row> rows, BalanceInfo primary, string primaryKey)
         {
             _busy = false;
-            _nextFetch = DateTime.Now.AddSeconds(Math.Max(5, Interval()));
+            _nextFetch = DateTime.Now.AddSeconds(Interval());
             if (primary == null)
             {
                 SetError("全部 Key 都读取失败");
@@ -762,10 +758,12 @@ namespace Dsb
             _busy = false;
         }
 
+        /// 自动刷新间隔（秒）。界面没有暴露配置项，保持固定值，避免误配成很久才刷一次。
+        private const int RefreshSeconds = 5;
+
         private int Interval()
         {
-            try { return Math.Max(5, int.Parse(_store.Get("interval", "60"))); }
-            catch { return 60; }
+            return RefreshSeconds;
         }
 
         private void ApplyPrimary(BalanceInfo bi, string key)
