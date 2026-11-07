@@ -19,6 +19,18 @@ namespace Dsb
                     "enabled=" + on + " now=" + Autostart.Enabled + " err=" + (err ?? "none"));
                 return 0;
             }
+            if (argv.Length > 1 && argv[1] == "--diag-ui")
+            {
+                Application dapp = new Application();
+                MainWindow dw = new MainWindow();
+                dapp.MainWindow = dw;
+                dw.Show();
+                bool stay = argv.Length > 2 && argv[2] == "stay";
+                bool keys = argv.Length > 2 && argv[2] == "keys";
+                dapp.Dispatcher.BeginInvoke(new Action(delegate { dw.RunDiag(stay, keys); }));
+                dapp.Run();
+                return 0;
+            }
             bool created;
             Mutex mutex = new Mutex(true, "Local\\DeepSeekBalanceFloat", out created);
             if (!created) return 0;

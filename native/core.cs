@@ -58,6 +58,7 @@ namespace Dsb
         [DllImport("user32.dll")]
         public static extern int GetWindowLong(IntPtr hWnd, int index);
 
+
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         public static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
 
@@ -587,6 +588,78 @@ namespace Dsb
             double r;
             double.TryParse(Convert.ToString(v), NumberStyles.Any, CultureInfo.InvariantCulture, out r);
             return r;
+        }
+    }
+
+    // ------------------------------------------------------------ 昼夜
+    internal static class SunTimes
+    {
+        private const double DefaultLatitude = 35.0;
+
+        /// 经纬度：默认北纬 35°，经度由时区推算；可在注册表用 lat / lon 覆盖
+        public static void GetLocation(Store store, out double lat, out double lon)
+        {
+            double la, lo;
+            lat = double.TryParse(store.Get("lat", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out la)
+                ? la : DefaultLatitude;
+            lon = double.TryParse(store.Get("lon", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out lo)
+                ? lo : TimeZoneInfo.Local.BaseUtcOffset.TotalHours * 15.0;
+        }
+
+        /// 当天日出 / 日落（本地时间）。极昼极夜或异常时回退 06:00 / 18:00。
+        public static void Compute(DateTime date, double lat, double lon, out TimeSpan sunrise, out TimeSpan sunset)
+        {
+            sunrise = TimeSpan.FromHours(6);
+            sunset = TimeSpan.FromHours(18);
+            try
+            {
+                double rad = Math.PI / 180.0;
+                double g = 2 * Math.PI / 365.0 * (date.DayOfYear - 1 + 0.5);
+                double eq = 229.18 * (0.000075 + 0.001868 * Math.Cos(g) - 0.032077 * Math.Sin(g)
+                           - 0.014615 * Math.Cos(2 * g) - 0.040849 * Math.Sin(2 * g));
+                double decl = 0.006918 - 0.399912 * Math.Cos(g) + 0.070257 * Math.Sin(g)
+                            - 0.006758 * Math.Cos(2 * g) + 0.000907 * Math.Sin(2 * g)
+                            - 0.002697 * Math.Cos(3 * g) + 0.00148 * Math.Sin(3 * g);
+                double latR = lat * rad;
+                double cosHa = Math.Cos(90.833 * rad) / (Math.Cos(latR) * Math.Cos(decl))
+                             - Math.Tan(latR) * Math.Tan(decl);
+                if (cosHa < -1 || cosHa > 1) return;   // 极昼 / 极夜
+                double ha = Math.Acos(cosHa) / rad;
+                double offsetMin = TimeZoneInfo.Local.GetUtcOffset(date).TotalMinutes;
+                double rise = 720 - 4 * (lon + ha) - eq + offsetMin;
+                double set = 720 - 4 * (lon - ha) - eq + offsetMin;
+                rise = ((rise % 1440) + 1440) % 1440;
+                set = ((set % 1440) + 1440) % 1440;
+                sunrise = TimeSpan.FromMinutes(rise);
+                sunset = TimeSpan.FromMinutes(set);
+            }
+            catch { }
+        }
+
+        public static bool IsNight(DateTime when)
+        {
+            double lat, lon;
+            GetLocation(new Store(), out lat, out lon);
+            TimeSpan rise, set;
+            Compute(when, lat, lon, out rise, out set);
+            TimeSpan t = when.TimeOfDay;
+            if (set < rise) return !(t >= set && t < rise);   // 跨午夜
+            return t < rise || t >= set;
+        }
+    }
+
+    internal static class Theme
+    {
+        public const string Auto = "auto";
+        public const string Light = "light";
+        public const string Dark = "dark";
+
+        /// 由模式解析出当前应使用深色还是浅色
+        public static bool ResolveDark(string mode)
+        {
+            if (mode == Dark) return true;
+            if (mode == Light) return false;
+            return SunTimes.IsNight(DateTime.Now);
         }
     }
 
