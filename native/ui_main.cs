@@ -146,7 +146,7 @@ namespace Dsb
         private readonly DispatcherTimer _timer = new DispatcherTimer();
 
         private Palette _pal;
-        private SolidColorBrush _bText, _bSub, _bCard, _bBorder, _bHover, _bAccent;
+        private SolidColorBrush _bText, _bSub, _bCard, _bBorder, _bHover, _bAccent, _bControl;
         private Canvas _root, _details, _multi;
         private Border _card, _foldBtn, _themeBtn;
         private Canvas _wave;
@@ -207,6 +207,7 @@ namespace Dsb
             _bBorder = Ui.Brush(_pal.Border);
             _bHover = Ui.Brush(_pal.Hover);
             _bAccent = Ui.Brush(AccentFor(0));
+            _bControl = Ui.Brush(ControlColor());
 
             _root = new Canvas();
             _root.Width = WinW;
@@ -318,6 +319,63 @@ namespace Dsb
             MouseRightButtonUp += OnRightUp;
             MouseMove += OnRootMove;
             MouseLeftButtonUp += OnRootUp;
+            Deactivated += OnWindowDeactivated;
+            Activated += OnWindowActivated;
+        }
+
+        // ------------------------------------------- 失焦 10 秒自动回主界面
+        private DispatcherTimer _idleTimer;
+
+        private void OnWindowDeactivated(object sender, EventArgs e)
+        {
+            if (_diagMode) return;                      // 诊断为测试保留页面
+            if (_activeView == null || _activeView == _mainView) return;
+            if (_idleTimer == null)
+            {
+                _idleTimer = new DispatcherTimer();
+                _idleTimer.Interval = TimeSpan.FromSeconds(10);
+                _idleTimer.Tick += delegate
+                {
+                    _idleTimer.Stop();
+                    AutoReturnToMain();
+                };
+            }
+            _idleTimer.Stop();
+            _idleTimer.Start();
+        }
+
+        private void OnWindowActivated(object sender, EventArgs e)
+        {
+            if (_idleTimer != null) _idleTimer.Stop();
+        }
+
+        private void AutoReturnToMain()
+        {
+            if (IsActive) return;                       // 已经回到前台
+            if (_activeView == null || _activeView == _mainView) return;
+            ResetToMain();
+        }
+
+        /// 立即切回主界面（无动画：此时窗口通常不在前台）
+        private void ResetToMain()
+        {
+            if (_activeView == null || _activeView == _mainView) return;
+            Canvas from = _activeView;
+
+            from.BeginAnimation(UIElement.OpacityProperty, null);
+            from.Opacity = 0;
+            from.IsHitTestVisible = false;
+            from.Visibility = Visibility.Collapsed;
+
+            _mainView.BeginAnimation(UIElement.OpacityProperty, null);
+            _mainView.Opacity = 1;
+            _mainView.Visibility = Visibility.Visible;
+            _mainView.IsHitTestVisible = true;
+
+            _activeView = _mainView;
+            _busyTransition = false;
+            if (_fxLayer != null) _fxLayer.Visibility = Visibility.Collapsed;
+            AnimateHeight(MainHeight());
         }
 
         private static Viewbox MakeWhale(double w, double h, Brush fill, double opacity)
@@ -614,6 +672,11 @@ namespace Dsb
                 st.ScaleY = 0;
                 _bCard.BeginAnimation(SolidColorBrush.ColorProperty, null);
                 _bCard.Color = _pal.Card;
+                if (_bControl != null)
+                {
+                    _bControl.BeginAnimation(SolidColorBrush.ColorProperty, null);
+                    _bControl.Color = ControlColor();
+                }
             };
             st.BeginAnimation(ScaleTransform.ScaleXProperty, grow);
             st.BeginAnimation(ScaleTransform.ScaleYProperty, grow);
@@ -639,6 +702,11 @@ namespace Dsb
             _bBorder.Color = _pal.Border;
             _bHover.Color = _pal.Hover;
             _bCard.Color = _pal.Card;
+            if (_bControl != null)
+            {
+                _bControl.BeginAnimation(SolidColorBrush.ColorProperty, null);
+                _bControl.Color = ControlColor();
+            }
             Native.ApplyBackdrop(_hwnd, IsDark);
         }
 
@@ -653,6 +721,12 @@ namespace Dsb
             a.EasingFunction = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.4 };
             st.BeginAnimation(ScaleTransform.ScaleXProperty, a);
             st.BeginAnimation(ScaleTransform.ScaleYProperty, a);
+        }
+
+        /// 开关 / 分段按钮的固定色（不随余额变化）
+        private Color ControlColor()
+        {
+            return IsDark ? Color.FromRgb(0x6C, 0xCB, 0x5F) : Color.FromRgb(0x0F, 0x7B, 0x3F);
         }
 
         private Color AccentFor(double total)
@@ -1112,8 +1186,11 @@ namespace Dsb
             RunDiag(false);
         }
 
+        private bool _diagMode;
+
         public void RunDiag(bool stay, bool keys)
         {
+            _diagMode = true;
             if (keys)
             {
                 ShowKeyPage();
@@ -1519,7 +1596,7 @@ namespace Dsb
             _keyPage = new KeyPage(_keys,
                 delegate { _stats.Save(); FetchAsync(); },
                 delegate { CloseKeyPage(); },
-                _bText, _bSub, _bBorder, _bHover, _bAccent, _bInput, IsDark);
+                _bText, _bSub, _bBorder, _bHover, _bControl, _bInput, IsDark);
             _keyView = _keyPage.View;
             _keyView.Visibility = Visibility.Collapsed;
             _keyView.Opacity = 0;
@@ -1571,7 +1648,7 @@ namespace Dsb
         {
             if (sw == null) return;
             sw.Background = on
-                ? _bAccent
+                ? _bControl
                 : Ui.Brush(IsDark ? Color.FromArgb(0x3A, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x22, 0, 0, 0));
             Ellipse knob = sw.Child as Ellipse;
             if (knob != null)
@@ -1606,7 +1683,7 @@ namespace Dsb
         {
             if (b == null) return;
             TextBlock t = b.Child as TextBlock;
-            b.Background = active ? _bAccent : Brushes.Transparent;
+            b.Background = active ? _bControl : Brushes.Transparent;
             b.BorderBrush = _bBorder;
             b.BorderThickness = active ? new Thickness(0) : new Thickness(1);
             if (t != null) t.Foreground = active ? Ui.Brush(Colors.White) : _bSub;

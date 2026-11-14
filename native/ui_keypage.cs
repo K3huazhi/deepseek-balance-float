@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using System.Windows.Shapes;
 
 namespace Dsb
@@ -28,7 +29,6 @@ namespace Dsb
         private TextBox _renameBox;
         private TextBlock _confirmText;
         private int _renaming = -1, _pending = -1;
-
         public KeyPage(List<KeyItem> keys, Action changed, Action back,
             SolidColorBrush text, SolidColorBrush sub, SolidColorBrush border,
             SolidColorBrush hover, SolidColorBrush accent, SolidColorBrush input, bool dark)
@@ -214,6 +214,27 @@ namespace Dsb
                 masked.TextTrimming = TextTrimming.CharacterEllipsis;
                 Ui.Place(c, masked, 8, 22);
 
+                // 复制 Key
+                Border copy = new Border();
+                copy.Width = 20;
+                copy.Height = 20;
+                copy.CornerRadius = new CornerRadius(4);
+                copy.Background = Brushes.Transparent;
+                copy.Cursor = Cursors.Hand;
+                TextBlock copyIcon = Ui.Icon("\uE8C8", 9, _sub);
+                copyIcon.HorizontalAlignment = HorizontalAlignment.Center;
+                copyIcon.VerticalAlignment = VerticalAlignment.Center;
+                copy.Child = copyIcon;
+                copy.MouseEnter += delegate { copy.Background = _hover; };
+                copy.MouseLeave += delegate { copy.Background = Brushes.Transparent; };
+                copy.MouseLeftButtonUp += delegate (object s, MouseButtonEventArgs e)
+                {
+                    e.Handled = true;
+                    CopyKey(k);
+                };
+                MainWindow.SetInteractive(copy, true);
+                Ui.Place(c, copy, 150, 10);
+
                 // 删除
                 Border del = new Border();
                 del.Width = 20;
@@ -236,7 +257,7 @@ namespace Dsb
                     RefreshConfirmText();
                 };
                 MainWindow.SetInteractive(del, true);
-                Ui.Place(c, del, 178, 10);
+                Ui.Place(c, del, 176, 10);
 
                 // 开关
                 Border sw = new Border();
@@ -455,6 +476,31 @@ namespace Dsb
                 RefreshRows();
                 if (_changed != null) _changed();
             }
+        }
+
+        /// 把完整 Key 复制到剪贴板（界面线程内有限次重试，避免挂起）
+        private void CopyKey(KeyItem k)
+        {
+            if (k == null) return;
+            string text = k.Key ?? "";
+            string label = string.IsNullOrEmpty(k.Name) ? "Key" : k.Name;
+
+            bool ok = false;
+            for (int i = 0; i < 5 && !ok; i++)
+            {
+                try
+                {
+                    Clipboard.SetText(text);
+                    ok = true;
+                }
+                catch
+                {
+                    // 有时数据已写入但关闭剪贴板失败，以内容为准再判断
+                    try { ok = Clipboard.GetText() == text; } catch { }
+                    if (!ok) System.Threading.Thread.Sleep(90);
+                }
+            }
+            SetHint(ok ? "已复制 " + label + " 到剪贴板" : "剪贴板被占用，请稍后再试", !ok);
         }
 
         // -------------------------------------------------------------- 操作
