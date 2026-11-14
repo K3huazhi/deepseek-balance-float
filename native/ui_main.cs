@@ -876,6 +876,7 @@ namespace Dsb
             {
                 ApplyPrimary(primary, primaryKey);
             }
+            if (_activeView == _statsView && _statsPage != null) _statsPage.Refresh();
             _lastUpdate = DateTime.Now.ToString("HH:mm:ss");
             if (_dUpdated != null) _dUpdated.Text = "更新于 " + _lastUpdate;
             _busy = false;
@@ -1172,6 +1173,8 @@ namespace Dsb
         private Canvas _settingsView;
         private Canvas _keyView;
         private KeyPage _keyPage;
+        private Canvas _statsView;
+        private StatsPage _statsPage;
         private Canvas _activeView;
         private bool _keyFromSettings;
         private SolidColorBrush _bInput;
@@ -1188,9 +1191,14 @@ namespace Dsb
 
         private bool _diagMode;
 
-        public void RunDiag(bool stay, bool keys)
+        public void RunDiag(bool stay, bool keys, bool stats)
         {
             _diagMode = true;
+            if (stats)
+            {
+                OpenStats();
+                return;
+            }
             if (keys)
             {
                 ShowKeyPage();
@@ -1425,6 +1433,21 @@ namespace Dsb
             PlayRipple(new Point(25, 22), delegate { SwapToView(_mainView); });
         }
 
+        private void OpenStats()
+        {
+            if (_busyTransition || _activeView == _statsView) return;
+            LockTransition(250);
+            _statsPage.Refresh();
+            SlideTo(_statsView, true);
+        }
+
+        private void CloseStats()
+        {
+            if (_busyTransition) return;
+            LockTransition(250);
+            SlideTo(_settingsView, false);
+        }
+
         private void ShowKeyPage()
         {
             if (_busyTransition || _activeView == _keyView) return;
@@ -1565,6 +1588,35 @@ namespace Dsb
             };
             Ui.Place(_settingsView, keyRow, 18, 186);
 
+            // 消耗记录
+            Border statsRow = new Border();
+            statsRow.Width = WinW - 36;
+            statsRow.Height = 36;
+            statsRow.CornerRadius = new CornerRadius(6);
+            statsRow.Background = Brushes.Transparent;
+            statsRow.Cursor = Cursors.Hand;
+            TextBlock statsLabel = Ui.Text("消耗记录", 12, _bText);
+            statsLabel.HorizontalAlignment = HorizontalAlignment.Left;
+            statsLabel.VerticalAlignment = VerticalAlignment.Center;
+            TextBlock statsArrow = Ui.Icon("", 9, _bSub);
+            statsArrow.HorizontalAlignment = HorizontalAlignment.Right;
+            statsArrow.VerticalAlignment = VerticalAlignment.Center;
+            statsArrow.Opacity = 0.7;
+            DockPanel statsLine = new DockPanel();
+            DockPanel.SetDock(statsArrow, Dock.Right);
+            statsLine.Children.Add(statsArrow);
+            statsLine.Children.Add(statsLabel);
+            statsRow.Child = statsLine;
+            statsRow.MouseEnter += delegate { statsRow.Background = _bHover; };
+            statsRow.MouseLeave += delegate { statsRow.Background = Brushes.Transparent; };
+            statsRow.MouseLeftButtonUp += delegate (object s, MouseButtonEventArgs e)
+            {
+                e.Handled = true;
+                OpenStats();
+            };
+            SetInteractive(statsRow, true);
+            Ui.Place(_settingsView, statsRow, 18, 222);
+
             // 退出
             Border quitRow = new Border();
             quitRow.Width = WinW - 36;
@@ -1584,11 +1636,12 @@ namespace Dsb
                 e.Handled = true;
                 Application.Current.Shutdown();
             };
-            Ui.Place(_settingsView, quitRow, 18, 226);
+            Ui.Place(_settingsView, quitRow, 18, 258);
 
-            TextBlock ver = Ui.Text("DeepSeek 余额悬浮窗 v2.0.0", 9.5, _bSub);
+            string verText = "DeepSeek 余额悬浮窗 v" + typeof(MainWindow).Assembly.GetName().Version.ToString(3);
+            TextBlock ver = Ui.Text(verText, 9.5, _bSub);
             ver.Opacity = 0.65;
-            Ui.Place(_settingsView, ver, 18, 292);
+            Ui.Place(_settingsView, ver, 18, 300);
 
             _root.Children.Add(_settingsView);
 
@@ -1601,6 +1654,13 @@ namespace Dsb
             _keyView.Visibility = Visibility.Collapsed;
             _keyView.Opacity = 0;
             _root.Children.Add(_keyView);
+
+            _statsPage = new StatsPage(_keys, _stats, delegate { CloseStats(); },
+                _bText, _bSub, _bBorder, _bHover, _bControl, IsDark);
+            _statsView = _statsPage.View;
+            _statsView.Visibility = Visibility.Collapsed;
+            _statsView.Opacity = 0;
+            _root.Children.Add(_statsView);
 
             BuildFx();
             _activeView = _mainView;

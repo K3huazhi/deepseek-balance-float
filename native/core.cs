@@ -377,6 +377,8 @@ namespace Dsb
     internal sealed class KeyStat
     {
         public Dictionary<string, double> Days = new Dictionary<string, double>();
+        /// 按「yyyy-MM-dd HH」记录的小时消耗，仅保留最近 7 天
+        public Dictionary<string, double> Hours = new Dictionary<string, double>();
         public double? Last = null;
     }
 
@@ -410,10 +412,16 @@ namespace Dsb
                 double spent = st.Last.Value - total;
                 if (spent > 0.0005)
                 {
-                    string day = DateTime.Today.ToString("yyyy-MM-dd");
+                    DateTime now = DateTime.Now;
+                    string day = now.ToString("yyyy-MM-dd");
                     double cur;
                     st.Days.TryGetValue(day, out cur);
                     st.Days[day] = Math.Round(cur + spent, 4);
+
+                    string hourKey = day + " " + now.Hour.ToString("00");
+                    double hv;
+                    st.Hours.TryGetValue(hourKey, out hv);
+                    st.Hours[hourKey] = Math.Round(hv + spent, 4);
                 }
             }
             st.Last = total;
@@ -437,6 +445,30 @@ namespace Dsb
                 arr[i] = Math.Round(v, 2);
             }
             return arr;
+        }
+
+        /// 最近 7 天 × 24 小时 的消耗矩阵（第 0 行是最早的一天）
+        public double[,] Heat(KeyStat st)
+        {
+            double[,] arr = new double[7, 24];
+            for (int d = 0; d < 7; d++)
+            {
+                string day = DateTime.Today.AddDays(d - 6).ToString("yyyy-MM-dd");
+                for (int h = 0; h < 24; h++)
+                {
+                    double v;
+                    if (st.Hours.TryGetValue(day + " " + h.ToString("00"), out v)) arr[d, h] = v;
+                }
+            }
+            return arr;
+        }
+
+        public double HeatSum(double[,] m)
+        {
+            double sum = 0;
+            for (int d = 0; d < m.GetLength(0); d++)
+                for (int h = 0; h < m.GetLength(1); h++) sum += m[d, h];
+            return Math.Round(sum, 2);
         }
 
         public void Load()
@@ -482,6 +514,14 @@ namespace Dsb
                         }
                     if (d.ContainsKey("last") && d["last"] != null)
                         st.Last = Convert.ToDouble(d["last"]);
+                    Dictionary<string, object> hours = d.ContainsKey("hours") ? d["hours"] as Dictionary<string, object> : null;
+                    if (hours != null)
+                        foreach (KeyValuePair<string, object> hv in hours)
+                        {
+                            double v;
+                            if (double.TryParse(Convert.ToString(hv.Value), NumberStyles.Any, CultureInfo.InvariantCulture, out v))
+                                st.Hours[hv.Key] = v;
+                        }
                     _map[kv.Key] = st;
                 }
             }
@@ -499,8 +539,16 @@ namespace Dsb
                     Dictionary<string, object> days = new Dictionary<string, object>();
                     foreach (KeyValuePair<string, double> d in kv.Value.Days)
                         if (string.CompareOrdinal(d.Key, cutoff) >= 0) days[d.Key] = d.Value;
+                    // 小时桶只保留最近 7 天
+                    string hcut = DateTime.Today.AddDays(-7).ToString("yyyy-MM-dd");
+                    Dictionary<string, object> hours = new Dictionary<string, object>();
+                    foreach (KeyValuePair<string, double> h in kv.Value.Hours)
+                        if (h.Key.Length >= 10 && string.CompareOrdinal(h.Key.Substring(0, 10), hcut) >= 0)
+                            hours[h.Key] = h.Value;
+
                     Dictionary<string, object> item = new Dictionary<string, object>();
                     item["days"] = days;
+                    item["hours"] = hours;
                     item["last"] = kv.Value.Last.HasValue ? (object)kv.Value.Last.Value : null;
                     root[kv.Key] = item;
                 }

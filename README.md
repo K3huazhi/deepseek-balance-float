@@ -2,7 +2,7 @@
 
 一个用于实时显示 DeepSeek API 账户余额的 Windows 桌面悬浮窗，采用 WinUI 3 / Fluent Design 风格，支持系统云母（Mica）背板、亮暗主题、多 Key 管理与用量统计。
 
-> 原生 C# + WPF 实现，单个约 116 KB 的 exe，无任何外部依赖；Windows 10 1903+ / 11 双击即用。
+> 原生 C# + WPF 实现，单个约 125 KB 的 exe，无任何外部依赖；Windows 10 1903+ / 11 双击即用。
 
 ---
 
@@ -15,14 +15,14 @@
 
 | 版本 | 体积 | 依赖 | 说明 |
 | --- | --- | --- | --- |
-| **v2.1 原生版** | **116 KB** | 无（.NET Framework 4.8 系统自带） | 推荐 |
+| **v2.2 原生版** | **125 KB** | 无（.NET Framework 4.8 系统自带） | 推荐 |
 | v1.x Python 版 | 55.8 MB / 126 KB | 内置运行时 / 需 Python | 已归档，不再更新 |
 
-### v2.1 原生版（推荐）
+### v2.2 原生版（推荐）
 
-**[⬇ DeepSeek-Balance-Float-v2.1.0.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v2.1.0/DeepSeek-Balance-Float-v2.1.0.exe)** · 116 KB
+**[⬇ DeepSeek-Balance-Float-v2.2.0.exe](https://github.com/K3huazhi/deepseek-balance-float/releases/download/v2.2.0/DeepSeek-Balance-Float-v2.2.0.exe)** · 125 KB
 
-SHA256：`5c6af7489d80054073666ec1848432a24e3c3cdc0dfdecef0a51b42542125817`
+SHA256：`a3be72d24d031fff05bd36e4e38a178be59aa78538d0b6f8bea9af80ca64c54e`
 
 Windows 10 1903+ 与 Windows 11 自带 .NET Framework 4.8，所以**不需要安装 Python，也不需要装任何运行时**，
 双击即用，启动不到 1 秒。
@@ -60,6 +60,8 @@ Windows 10 1903+ 与 Windows 11 自带 .NET Framework 4.8，所以**不需要安
 - **余额展示**：实时余额、可用状态、充值余额、赠送余额、今日消费
 - **每 5 秒自动刷新**，右键可立即刷新
 - **近 7 日消耗柱状图** + 按近期均耗估算的可用天数
+- **消耗记录**（设置 → 消耗记录）：7 天 × 24 小时热力图，颜色深浅表示该小时消耗；
+  下方按凌晨 / 上午 / 下午 / 晚间四段汇总；按 Key 分别记录，顶部芯片切换
 - **多 Key 支持**：最多保存 10 个 API Key，最多同时显示 3 个
   - 显示 ≥ 2 个时自动切换为紧凑视图，只显示各 Key 的余额与今日消耗
 - **Key 命名**：可为每个 Key 命名，不命名时默认取 `sk-` 之后的六位
@@ -80,6 +82,10 @@ Windows 10 1903+ 与 Windows 11 自带 .NET Framework 4.8，所以**不需要安
 | 设置页 | API Key 管理 |
 | --- | --- |
 | ![settings](docs/preview-settings.png) | ![keys](docs/preview-keys.png) |
+
+| 消耗记录（7 天 × 24 小时） |
+| --- |
+| ![stats](docs/preview-stats.png) |
 
 | 展开详情 | 多 Key 视图 |
 | --- | --- |
@@ -116,6 +122,7 @@ Windows 10 1903+ 与 Windows 11 自带 .NET Framework 4.8，所以**不需要安
 | 左键拖动 | 移动窗口（5 px 起拖），靠近屏幕边缘自动吸附，位置自动保存 |
 | 右键单击 | 立即刷新余额 |
 | 点左上角鲸鱼 | 进入设置页（水波纹过渡） |
+| 设置 → 消耗记录 | 查看该 Key 最近 7 天的分时段消耗热力图 |
 | 右上角 ⌄ / ⌃ | 展开或收起详情面板 |
 | 右上角 ☀ / ☾ / Auto | 循环切换：亮色 → 暗色 → 自动 |
 | 点 Key 名称 | 在底部改名条中重命名（Enter 保存，Esc 取消） |
@@ -180,6 +187,7 @@ native/
   core.cs          Win32 / DWM 云母 / 凭据管理器 / 注册表 / HTTP / 统计 / 日出日落
   ui_main.cs       主界面 + 设置页 + 视图切换（水波纹、横向滑动）
   ui_keypage.cs    内嵌 API Key 管理页
+  ui_stats.cs      消耗记录页（7 天 × 24 小时热力图）
   program.cs       入口、单实例互斥、鲸鱼 SVG 路径、诊断开关
   AssemblyInfo.cs  版本信息
   app.manifest     PerMonitorV2 高 DPI + asInvoker

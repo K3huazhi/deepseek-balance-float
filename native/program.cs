@@ -27,7 +27,8 @@ namespace Dsb
                 dw.Show();
                 bool stay = argv.Length > 2 && argv[2] == "stay";
                 bool keys = argv.Length > 2 && argv[2] == "keys";
-                dapp.Dispatcher.BeginInvoke(new Action(delegate { dw.RunDiag(stay, keys); }));
+                bool stats = argv.Length > 2 && argv[2] == "stats";
+                dapp.Dispatcher.BeginInvoke(new Action(delegate { dw.RunDiag(stay, keys, stats); }));
                 dapp.Run();
                 return 0;
             }
