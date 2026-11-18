@@ -110,7 +110,8 @@
 - Key 仅保存在本机钥匙串，不会写入程序目录，也不会发送到 DeepSeek 官方接口以外的服务器。
 - 除余额接口外，应用不发起任何网络请求，不含分析、崩溃上报或自动更新。
 - 默认接口：`https://api.deepseek.com/user/balance`，可在「设置 → 通用 → 高级」修改。
-- 统计来自前后两次余额的差值，只在有实际消耗时增长；应用退出期间的消耗无法回溯。
+- 统计来自前后两次余额的差值，只在有实际消耗时增长；两次采样间隔超过 **60 秒**（睡眠、退出、重新显示 Key）时只更新基准，不补记。
+- 接口地址除 localhost 外必须使用 HTTPS；所有 HTTP 重定向都会被拒绝，避免 Authorization 被带到其他主机。
 
 ---
 
@@ -180,7 +181,7 @@ Sources/DeepSeekBalanceFloat/
   SunTimes.swift          日出日落
   ApiClient.swift         DeepSeek 接口与错误映射
   Keychain.swift          钥匙串读写
-  LoginItem.swift         SMAppService + LaunchAgent 兜底
+  LoginItem.swift         SMAppService 登录项（不再写 LaunchAgent）
   WindowSnapper.swift     边缘吸附
   WhaleShape.swift        由官方鲸鱼 SVG path 生成的 SwiftUI Shape
 
@@ -207,7 +208,7 @@ Windows 版源码仍在仓库根目录（`../native/`、`../balance_float.py`）
 | Windows 凭据管理器（DPAPI） | macOS 登录钥匙串（Security.framework） |
 | 注册表 `HKCU\Software\DeepSeekBalance` | `UserDefaults` + Application Support |
 | `.NET Framework 4.8` 单 exe | Universal `.app`，无运行时依赖 |
-| 注册表 Run 键 / Startup | `SMAppService`，失败时回退 LaunchAgent |
+| 注册表 Run 键 / Startup | `SMAppService`，失败时提示在系统设置中手动添加 |
 | 5 秒刷新、7 × 24 热力图、多 Key 规则、余额色阶 | 完全保留同一套数据规则 |
 
 **不兼容**：Windows 版的 Key、统计与设置无法直接迁移到 macOS（存储机制不同）。在 macOS 版中重新添加 Key 即可；
@@ -287,7 +288,7 @@ APPLE_API_KEY=/path/AuthKey_XXXX.p8 APPLE_API_KEY_ID=XXXX APPLE_API_ISSUER=xxxx-
 
 - 默认产物使用 ad-hoc 签名，未做 Apple 公证；首次打开需右键「打开」，更新后可能出现一次钥匙串授权。
   如已配置 Developer ID 与公证凭据，运行 `scripts/sign_and_notarize.sh` 即可得到 Gatekeeper 直接放行的版本。
-- 没有 Apple Developer ID 时，无法使用 `SMAppService` 的场景会自动回退到 `~/Library/LaunchAgents` 登录项。
+- ad-hoc / 未公证构建下 `SMAppService` 可能拒绝自动注册；此时需在「系统设置 → 通用 → 登录项」中手动添加，应用不会再写 `~/Library/LaunchAgents`。旧版本留下的 LaunchAgent 会在启动时清理。
 - 余额接口只支持 DeepSeek 官方 `balance_infos` 结构；自建代理需保持同样返回格式。
 - 统计依赖应用持续运行；睡眠 / 退出期间的消费不会补记。
 - 应用为单实例；重复打开会激活已有实例。
