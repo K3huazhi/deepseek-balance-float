@@ -1,6 +1,11 @@
 # DeepSeek 余额悬浮窗
 
-一个用于实时显示 DeepSeek API 账户余额的 Windows 桌面悬浮窗，采用 WinUI 3 / Fluent Design 风格，支持系统云母（Mica）背板、亮暗主题、多 Key 管理与用量统计。
+一个用于实时显示 DeepSeek API 账户余额的桌面悬浮窗。
+
+- **Windows**：WinUI 3 / Fluent Design 风格，系统云母（Mica）背板
+- **macOS 26 Tahoe**：SwiftUI + Liquid Glass，菜单栏常驻
+
+两端都支持亮暗主题、多 Key 管理与用量统计。
 
 > 原生 C# + WPF 实现，单个约 125 KB 的 exe，无任何外部依赖；Windows 10 1903+ / 11 双击即用。
 
@@ -34,6 +39,22 @@ Windows 10 1903+ 与 Windows 11 自带 .NET Framework 4.8，所以**不需要安
 与 Python 版使用相同位置，**从旧版本升级不会丢失 Key、命名和历史消耗记录**。
 
 历史版本见 [Releases](https://github.com/K3huazhi/deepseek-balance-float/releases)。
+
+### macOS 26 Tahoe 原生版
+
+SwiftUI + Liquid Glass 重制，菜单栏余额 + 悬浮面板，功能与 Windows 版对齐
+（多 Key、7 天消耗热力图、亮/暗/自动主题、开机自启、拖动吸附）。
+
+目前**需要自行编译**（暂无官方 DMG 下载）：
+
+```bash
+git clone https://github.com/K3huazhi/deepseek-balance-float.git
+cd deepseek-balance-float/macos
+./scripts/build.sh        # 需要 macOS 26 SDK + Xcode Command Line Tools
+```
+
+源码在 [`macos/`](macos/)，完整构建、签名与公证说明见
+[`macos/README.md`](macos/README.md)。产物为 ad-hoc 签名，首次打开需右键「打开」。
 
 ---
 
