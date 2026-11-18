@@ -36,6 +36,11 @@ final class AppModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var lastThemeTick = Date.distantPast
 
+    /// 轮询退避状态（按 Key 指纹）。401 会暂停该 Key，手动刷新可恢复。
+    private var authFailed: Set<String> = []
+    private var failureCounts: [String: Int] = [:]
+    private var nextAttempt: [String: Date] = [:]
+
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_Hans_CN")
@@ -126,6 +131,7 @@ final class AppModel: ObservableObject {
     // MARK: - 刷新
 
     func start() {
+        LoginItem.cleanupLegacyAgent()
         Task { [weak self] in
             let enabled = await Task.detached { LoginItem.isEnabled }.value
             self?.settings.launchAtLogin = enabled
@@ -134,7 +140,7 @@ final class AppModel: ObservableObject {
         refreshLoop?.cancel()
         refreshLoop = Task { [weak self] in
             while !Task.isCancelled {
-                self?.refreshAll()
+                self?.refreshAll(force: false)
                 try? await Task.sleep(for: .seconds(5))
                 self?.themeTick()
             }
@@ -147,7 +153,8 @@ final class AppModel: ObservableObject {
         refreshLoop = nil
     }
 
-    func refreshAll() {
+    /// - Parameter force: 手动刷新时为 true，会清除 401 暂停与退避，立即重试。
+    func refreshAll(force: Bool = true) {
         guard !isRefreshing else { return }
         if isDemo {
             isRefreshing = true
@@ -159,10 +166,21 @@ final class AppModel: ObservableObject {
             return
         }
 
-        let targets = visibleKeys.map { (uid: $0.id, key: $0.key) }
+        if force {
+            authFailed.removeAll()
+            failureCounts.removeAll()
+            nextAttempt.removeAll()
+        }
+
+        let now = Date()
+        let targets = visibleKeys
+            .filter { key in
+                !authFailed.contains(key.id)
+                    && (nextAttempt[key.id] ?? .distantPast) <= now
+            }
+            .map { (uid: $0.id, key: $0.key) }
         guard !targets.isEmpty else {
             isRefreshing = false
-            lastUpdate = Date()
             return
         }
         isRefreshing = true
@@ -196,12 +214,16 @@ final class AppModel: ObservableObject {
     private func apply(_ results: [(String, Result<BalanceInfo, Error>)]) {
         var statsChanged = false
         var newDrop: (uid: String, amount: Double, symbol: String)?
+        let sampledAt = Date()
         for (uid, result) in results {
             switch result {
             case let .success(info):
                 balances[uid] = info
                 errors[uid] = nil
-                let spent = stats.record(uid: uid, total: info.total)
+                authFailed.remove(uid)
+                failureCounts[uid] = nil
+                nextAttempt[uid] = nil
+                let spent = stats.record(uid: uid, total: info.total, at: sampledAt)
                 if spent > 0 {
                     statsChanged = true
                     if uid == primaryKey?.id {
@@ -210,6 +232,19 @@ final class AppModel: ObservableObject {
                 }
             case let .failure(error):
                 errors[uid] = error.localizedDescription
+                if let apiError = error as? APIError, apiError.status == 401 {
+                    // Key 无效时停止自动轮询，等用户手动刷新或重新添加。
+                    authFailed.insert(uid)
+                    failureCounts[uid] = nil
+                    nextAttempt[uid] = nil
+                } else {
+                    let count = min(7, (failureCounts[uid] ?? 0) + 1)
+                    failureCounts[uid] = count
+                    let exponential = min(300, 5 * pow(2, Double(count - 1)))
+                    let retryAfter = (error as? APIError)?.retryAfter ?? 0
+                    let delay = max(5, min(300, retryAfter > 0 ? retryAfter : exponential))
+                    nextAttempt[uid] = Date().addingTimeInterval(delay)
+                }
             }
         }
         if statsChanged {
@@ -287,7 +322,14 @@ final class AppModel: ObservableObject {
         if !next.isEmpty, !next.contains(where: { $0.show }) {
             next[0].show = true
         }
-        return commit(next)
+        if let error = commit(next) { return error }
+
+        balances[id] = nil
+        errors[id] = nil
+        authFailed.remove(id)
+        failureCounts[id] = nil
+        nextAttempt[id] = nil
+        return nil
     }
 
     @discardableResult

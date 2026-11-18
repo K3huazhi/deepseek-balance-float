@@ -4,6 +4,8 @@ struct KeyStat: Codable, Equatable {
     var days: [String: Double] = [:]
     var hours: [String: Double] = [:]
     var last: Double?
+    /// 上一次采样的时间；旧数据没有该字段，首次恢复时只更新基准。
+    var lastAt: Date?
 }
 
 /// 本地消耗统计。数据保存在 `~/Library/Application Support/DeepSeekBalanceFloat/stats.json`，
@@ -27,22 +29,28 @@ final class StatsStore {
 
     // MARK: - 记录
 
+    /// 两次采样间隔超过该值时，视为睡眠/退出/重新显示，只更新基准不记账。
+    static let maximumSampleGap: TimeInterval = 60
+
     /// 记录一次余额；返回本次推算出的消耗（无消耗返回 0）。
+    /// - Parameter at: 采样时间。只有与前一次采样间隔 ≤ 60 秒时才把余额差记到 `at` 所在的小时。
     @discardableResult
-    func record(uid: String, total: Double) -> Double {
+    func record(uid: String, total: Double, at: Date = Date()) -> Double {
         var stat = map[uid] ?? KeyStat()
         var spent: Double = 0
-        if let last = stat.last {
+        if let last = stat.last, let lastAt = stat.lastAt {
+            let gap = at.timeIntervalSince(lastAt)
             let delta = last - total
-            if delta > 0.0005 {
+            if gap >= 0, gap <= Self.maximumSampleGap, delta > 0.0005 {
                 spent = delta
-                let day = Self.dayKey(Date())
+                let day = Self.dayKey(at)
                 stat.days[day] = ((stat.days[day] ?? 0) + delta).rounded(to: 4)
-                let hour = Self.hourKey(Date())
+                let hour = Self.hourKey(at)
                 stat.hours[hour] = ((stat.hours[hour] ?? 0) + delta).rounded(to: 4)
             }
         }
         stat.last = total
+        stat.lastAt = at
         map[uid] = stat
         return spent
     }

@@ -2,7 +2,27 @@ import Foundation
 
 struct APIError: LocalizedError {
     let message: String
+    var status: Int?
+    var retryAfter: TimeInterval?
+
+    init(message: String, status: Int? = nil, retryAfter: TimeInterval? = nil) {
+        self.message = message
+        self.status = status
+        self.retryAfter = retryAfter
+    }
+
     var errorDescription: String? { message }
+}
+
+/// 拒绝一切 HTTP 重定向，避免把 Authorization 带到其他主机。
+private final class RedirectBlocker: NSObject, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession,
+                    task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
+    }
 }
 
 private struct BalanceEnvelope: Decodable {
@@ -48,26 +68,56 @@ private struct BalanceEntry: Decodable {
 }
 
 enum ApiClient {
-    static func fetch(key: String, urlString: String) async throws -> BalanceInfo {
+    private static let redirectBlocker = RedirectBlocker()
+
+    /// 共享 session：复用连接、统一超时与重定向策略。
+    private static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForResource = 20
+        configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration, delegate: redirectBlocker, delegateQueue: nil)
+    }()
+
+    /// 校验接口地址：非 loopback 一律要求 HTTPS。
+    static func validatedURL(_ urlString: String) throws -> URL {
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: trimmed.isEmpty ? AppSettings.defaultURL : trimmed),
-              let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http" else {
+              let scheme = url.scheme?.lowercased(),
+              scheme == "https" || scheme == "http",
+              let host = url.host, !host.isEmpty else {
             throw APIError(message: "接口地址无效")
         }
+        if scheme == "http", !isLoopback(host) {
+            throw APIError(message: "接口地址必须使用 HTTPS（localhost 除外）")
+        }
+        return url
+    }
+
+    private static func isLoopback(_ host: String) -> Bool {
+        let h = host.lowercased()
+        if h == "localhost" || h == "::1" || h.hasSuffix(".localhost") {
+            return true
+        }
+        // 只接受 127.0.0.0/8 的数字地址，避免 "127.example.com" 被当成 loopback。
+        let parts = h.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 4, parts[0] == "127" else { return false }
+        return parts.dropFirst().allSatisfy { part in
+            guard let value = Int(part) else { return false }
+            return (0...255).contains(value)
+        }
+    }
+
+    static func fetch(key: String, urlString: String) async throws -> BalanceInfo {
+        let url = try validatedURL(urlString)
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
         request.httpMethod = "GET"
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("DeepSeekBalanceFloat/3.0 (macOS)", forHTTPHeaderField: "User-Agent")
-
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 15
-        configuration.timeoutIntervalForResource = 20
-        configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        configuration.waitsForConnectivity = false
-        let session = URLSession(configuration: configuration)
+        request.setValue("DeepSeekBalanceFloat/1.0 (macOS)", forHTTPHeaderField: "User-Agent")
 
         let data: Data
         let response: URLResponse
@@ -90,13 +140,14 @@ enum ApiClient {
         case 200...299:
             break
         case 401:
-            throw APIError(message: "Key 无效或已被删除")
+            throw APIError(message: "Key 无效或已被删除", status: 401)
         case 402:
-            throw APIError(message: "账户余额不足")
+            throw APIError(message: "账户余额不足", status: 402)
         case 429:
-            throw APIError(message: "请求过于频繁")
+            let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init)
+            throw APIError(message: "请求过于频繁", status: 429, retryAfter: retryAfter)
         default:
-            throw APIError(message: "接口返回 \(http.statusCode)")
+            throw APIError(message: "接口返回 \(http.statusCode)", status: http.statusCode)
         }
 
         return try decode(data)

@@ -1,71 +1,58 @@
 import Foundation
 import ServiceManagement
 
-/// 开机自启。优先使用 macOS 13+ 的 `SMAppService`（会出现在「系统设置 → 通用 → 登录项」）；
-/// 对于未签名的本地构建，若系统拒绝注册则自动回退为当前用户的 LaunchAgent。
+/// 开机自启。只使用 macOS 13+ 的 `SMAppService`（「系统设置 → 通用 → 登录项」），
+/// 不再写 `~/Library/LaunchAgents`，避免绕过系统设置、卸载后残留。
 enum LoginItem {
-    static let agentLabel = "com.k3huazhi.DeepSeekBalanceFloat"
-
-    static var agentURL: URL {
+    /// 旧版本可能写入的 LaunchAgent 路径；仅用于清理，不再创建。
+    private static var legacyAgentURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/LaunchAgents/\(agentLabel).plist")
+            .appendingPathComponent("Library/LaunchAgents/com.k3huazhi.DeepSeekBalanceFloat.plist")
+    }
+
+    static var status: SMAppService.Status {
+        SMAppService.mainApp.status
     }
 
     static var isEnabled: Bool {
-        if SMAppService.mainApp.status == .enabled { return true }
-        return FileManager.default.fileExists(atPath: agentURL.path)
+        status == .enabled || status == .requiresApproval
     }
 
-    /// 返回 nil 表示完全成功，否则返回一条可展示给用户的说明。
+    static var requiresApproval: Bool {
+        status == .requiresApproval
+    }
+
+    /// 返回 nil 表示成功，否则返回一条可展示给用户的说明。
     @discardableResult
     static func setEnabled(_ enabled: Bool) -> String? {
+        cleanupLegacyAgent()
         if enabled {
-            do {
-                if SMAppService.mainApp.status != .enabled {
-                    try SMAppService.mainApp.register()
-                }
-                removeAgent()
+            switch status {
+            case .enabled:
                 return nil
-            } catch {
+            case .requiresApproval:
+                return "登录项已注册，正在等待系统批准：请到「系统设置 → 通用 → 登录项」中允许。"
+            default:
                 do {
-                    try installAgent()
-                    return "系统登录项不可用，已改用 LaunchAgent 实现开机自启。"
+                    try SMAppService.mainApp.register()
                 } catch {
-                    return "无法开启开机自启：\(error.localizedDescription)"
+                    return "无法自动注册登录项：\(error.localizedDescription)\n请在「系统设置 → 通用 → 登录项」中手动添加本应用。"
                 }
+                if status == .requiresApproval {
+                    return "登录项已注册，正在等待系统批准：请到「系统设置 → 通用 → 登录项」中允许。"
+                }
+                return nil
             }
-        } else {
-            if SMAppService.mainApp.status != .notRegistered {
-                try? SMAppService.mainApp.unregister()
-            }
-            removeAgent()
-            return nil
         }
+
+        if status != .notRegistered {
+            try? SMAppService.mainApp.unregister()
+        }
+        return nil
     }
 
-    private static func installAgent() throws {
-        let bundle = Bundle.main.bundlePath
-        let program: [String]
-        if bundle.hasSuffix(".app") {
-            program = ["/usr/bin/open", "-a", bundle]
-        } else {
-            program = [Bundle.main.executablePath ?? CommandLine.arguments[0]]
-        }
-        let plist: [String: Any] = [
-            "Label": agentLabel,
-            "ProgramArguments": program,
-            "RunAtLoad": true,
-            "KeepAlive": false,
-            "ProcessType": "Interactive",
-            "LimitLoadToSessionType": "Aqua"
-        ]
-        let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
-        try FileManager.default.createDirectory(at: agentURL.deletingLastPathComponent(),
-                                                withIntermediateDirectories: true)
-        try data.write(to: agentURL, options: .atomic)
-    }
-
-    private static func removeAgent() {
-        try? FileManager.default.removeItem(at: agentURL)
+    /// 清理旧版可能留下的 LaunchAgent；新版本不会再创建。
+    static func cleanupLegacyAgent() {
+        try? FileManager.default.removeItem(at: legacyAgentURL)
     }
 }

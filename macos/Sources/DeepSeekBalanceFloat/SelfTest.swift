@@ -44,6 +44,13 @@ enum SelfTest {
         check(stats.heatTotal("abc") >= 0.99, "热力图汇总正确")
         stats.record(uid: "abc", total: 10)
         check(abs(stats.today("abc") - 1.0) < 0.001, "余额增加不计入消费")
+
+        let gapBase = Date()
+        stats.record(uid: "gap", total: 10, at: gapBase)
+        let longGap = stats.record(uid: "gap", total: 9, at: gapBase.addingTimeInterval(120))
+        check(longGap == 0, "间隔超过 60 秒不补记")
+        let shortGap = stats.record(uid: "gap", total: 8.5, at: gapBase.addingTimeInterval(125))
+        check(abs(shortGap - 0.5) < 0.001, "间隔 5 秒正常记账")
         try? FileManager.default.removeItem(at: statsURL)
 
         let json = """
@@ -92,6 +99,15 @@ enum SelfTest {
         check(BalanceTone.tone(total: 9, available: true) == .positive, "余额充足为绿色")
         check(BalanceTone.tone(total: 1, available: true) == .warning, "余额偏低为黄色")
         check(BalanceTone.tone(total: 0.2, available: true) == .negative, "余额不足为红色")
+
+        check((try? ApiClient.validatedURL("http://example.com/user/balance")) == nil,
+              "非 localhost 拒绝 HTTP")
+        check((try? ApiClient.validatedURL("http://127.0.0.1:8765/user/balance")) != nil,
+              "允许 localhost HTTP")
+        check((try? ApiClient.validatedURL("https://api.deepseek.com/user/balance")) != nil,
+              "允许 HTTPS")
+        check((try? ApiClient.validatedURL("http://127.0.0.1.evil.com/user/balance")) == nil,
+              "拒绝伪装成 127.x 的域名")
 
         if passed { print("\n全部自检通过。") } else { print("\n存在失败项。") }
         return passed
