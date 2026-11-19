@@ -45,7 +45,14 @@ Windows 10 1903+ 与 Windows 11 自带 .NET Framework 4.8，所以**不需要安
 SwiftUI + Liquid Glass 重制，菜单栏余额 + 悬浮面板，功能与 Windows 版对齐
 （多 Key、7 天消耗热力图、亮/暗/自动主题、开机自启、拖动吸附）。
 
-目前**需要自行编译**（暂无官方 DMG 下载）：
+**[⬇ DeepSeek-Balance-Float-macos-v1.0.0-universal.dmg](https://github.com/K3huazhi/deepseek-balance-float/releases/download/macos-v1.0.0/DeepSeek-Balance-Float-macos-v1.0.0-universal.dmg)** · 1.7 MB
+
+SHA256：`dfe9b67255700e74105f0a7d3876a5dba43ef36b757a3f8d47a1c666fe2b40f0`
+
+要求 macOS 26.0 Tahoe 或更高，Universal Binary（Apple Silicon / Intel 通用）。
+自签名证书为 ad-hoc、未做 Apple 公证，首次打开需右键「打开」。
+
+也可以自行编译：
 
 ```bash
 git clone https://github.com/K3huazhi/deepseek-balance-float.git
@@ -54,7 +61,7 @@ cd deepseek-balance-float/macos
 ```
 
 源码在 [`macos/`](macos/)，完整构建、签名与公证说明见
-[`macos/README.md`](macos/README.md)。产物为 ad-hoc 签名，首次打开需右键「打开」。
+[`macos/README.md`](macos/README.md)。
 
 ---
 
